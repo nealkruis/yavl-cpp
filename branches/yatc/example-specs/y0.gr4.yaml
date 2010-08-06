@@ -1,0 +1,12 @@
+header:
+  name: Ranga
+  version: 1.042s20
+  size: big
+  pieces:
+    a:
+      - a1: First A1
+        a2: First A2
+
+      - a1: Second A1
+        a2: Second A2
+    b: [100, 200, 300]
