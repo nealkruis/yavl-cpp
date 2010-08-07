@@ -11,6 +11,8 @@ namespace YAVL
 {
   enum ElemType { SCALAR, VECTOR, STRUCT, ENUM };
 
+  std::string to_lower_copy(std::string s);
+
   struct EnumDef {
     std::string name;
     std::vector<std::string> enum_values;
