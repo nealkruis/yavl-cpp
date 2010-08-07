@@ -2,12 +2,19 @@
 #include <assert.h>
 #include "yaml.h"
 #include "yatc.h"
-#include <boost/algorithm/string/case_conv.hpp>
 #include <ctype.h>
 
 using namespace std;
 using namespace YAVL;
-using namespace boost;
+
+string YAVL::to_lower_copy(string s)
+{
+  string rsl(s.size(), ' ');
+  for (string::size_type i = 0; i < s.size(); ++i) {
+    rsl[i] = tolower(s[i]);
+  }
+  return rsl;
+}
 
 RslType RWGen::make_map_type(const YAML::Node &mapNode, string name)
 {
