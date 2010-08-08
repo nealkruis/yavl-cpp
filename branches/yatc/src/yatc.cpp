@@ -19,7 +19,7 @@ string YAVL::to_lower_copy(string s)
 RslType RWGen::make_map_type(const YAML::Node &mapNode, string name)
 {
   bool ok = true;
-  StructElem rsl;
+  TypeDefinition rsl;
   rsl.elem_type = STRUCT;
   rsl.type = to_lower_copy(name);
   rsl.type[0] = toupper(rsl.type[0]);
@@ -29,7 +29,7 @@ RslType RWGen::make_map_type(const YAML::Node &mapNode, string name)
     string key = i.first();
     const YAML::Node &valueNode = i.second();
     RslType subrsl = make_types(valueNode, key);
-    StructElem *e = new StructElem(subrsl.first);
+    TypeDefinition *e = new TypeDefinition(subrsl.first);
     rsl.elems.push_back(e);
     ok = subrsl.second && ok;
   }
@@ -46,7 +46,7 @@ RslType RWGen::make_scalar_type(const YAML::Node &doc, string name)
   string type = typespec_map.begin().first();
   const YAML::Node& type_specifics = typespec_map.begin().second();
 
-  StructElem elem;
+  TypeDefinition elem;
 
   elem.name = name;
 
@@ -82,7 +82,7 @@ RslType RWGen::make_scalar_type(const YAML::Node &doc, string name)
 
 RslType RWGen::make_list_type(const YAML::Node &doc, string name)
 {
-  StructElem elem;
+  TypeDefinition elem;
   elem.name = name;
   elem.elem_type = VECTOR;
   
@@ -94,7 +94,7 @@ RslType RWGen::make_list_type(const YAML::Node &doc, string name)
      vec_elem_type.erase(vec_elem_type.end()-1);
   }
   RslType subrsl = make_types(doc, vec_elem_type);
-  StructElem *e = new StructElem(subrsl.first);
+  TypeDefinition *e = new TypeDefinition(subrsl.first);
   elem.vector_type = e;
 
   elem.type = string("std::vector<") + elem.vector_type->type + string(" >");
@@ -117,7 +117,7 @@ RslType RWGen::make_types(const YAML::Node& doc, string name)
   return rsl;
 }
 
-void RWGen::emit_enum_def(const StructElem &elem, ostream& os)
+void RWGen::emit_enum_def(const TypeDefinition &elem, ostream& os)
 {
   os << "enum " << elem.enum_def.name << " { ";
   vector<string>::const_iterator i = elem.enum_def.enum_values.begin();
@@ -132,7 +132,7 @@ void RWGen::emit_enum_def(const StructElem &elem, ostream& os)
   write_put_operator_prolog(os, elem.type, true /* prototype */);
 }
 
-bool RWGen::emit_header(const StructElem &elem, ostream& os)
+bool RWGen::emit_header(const TypeDefinition &elem, ostream& os)
 {
   switch (elem.elem_type) {
     case ENUM:
@@ -149,7 +149,7 @@ bool RWGen::emit_header(const StructElem &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<StructElem*>::const_iterator i = elem.elems.begin();
+      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
         if (((*i)->elem_type == ENUM)) {
@@ -166,7 +166,7 @@ bool RWGen::emit_header(const StructElem &elem, ostream& os)
       os << "struct " << elem.type << " {" << endl;
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const StructElem& e = **i;
+        const TypeDefinition& e = **i;
         os << "  " << e.type << " " << e.name << ";" << endl;
       }
       os << "};" << endl;
@@ -190,7 +190,7 @@ bool RWGen::emit_header(ostream& os)
   return true;
 }
 
-void RWGen::emit_enum_reader(const StructElem &elem, ostream& os)
+void RWGen::emit_enum_reader(const TypeDefinition &elem, ostream& os)
 {
   os << "void operator >>(const YAML::Node& node, " << elem.type << " &obj) {" << endl;
   os << "  string tmp; node >> tmp;" << endl;
@@ -201,7 +201,7 @@ void RWGen::emit_enum_reader(const StructElem &elem, ostream& os)
   os << "}" << endl;
 }
 
-bool RWGen::emit_reader(const StructElem &elem, ostream& os)
+bool RWGen::emit_reader(const TypeDefinition &elem, ostream& os)
 {
   switch (elem.elem_type) {
     case ENUM:
@@ -224,7 +224,7 @@ bool RWGen::emit_reader(const StructElem &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<StructElem*>::const_iterator i = elem.elems.begin();
+      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
         if (((*i)->elem_type == ENUM)) {
@@ -241,7 +241,7 @@ bool RWGen::emit_reader(const StructElem &elem, ostream& os)
       os << "void operator >>(const YAML::Node& node, " << elem.type << " &obj) {" << endl;
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const StructElem& e = **i;
+        const TypeDefinition& e = **i;
         os << "  node[\"" << e.name << "\"] >> obj." << e.name << ";" << endl;
       }
       os << "}" << endl;
@@ -261,7 +261,7 @@ bool RWGen::emit_reader(ostream& os)
   return true;
 }
 
-void RWGen::emit_enum_dumper(const StructElem &elem, ostream& os)
+void RWGen::emit_enum_dumper(const TypeDefinition &elem, ostream& os)
 {
   write_put_operator_prolog(os, elem.type);
   vector<string>::const_iterator i = elem.enum_def.enum_values.begin();
@@ -289,7 +289,7 @@ bool RWGen::write_put_operator_epilog(ostream& os)
 }
 
 #if 0
-bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
+bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
 {
   switch (elem.elem_type) {
     case ENUM:
@@ -309,7 +309,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<StructElem*>::const_iterator i = elem.elems.begin();
+      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
         if (((*i)->elem_type == ENUM)) {
@@ -326,7 +326,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
       write_put_operator_prolog(os, elem.type);
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const StructElem& e = **i;
+        const TypeDefinition& e = **i;
         os << "  os << \"" << e.name << ": \" << obj." << e.name << " << endl;" << endl;
       }
       write_put_operator_epilog(os);
@@ -336,7 +336,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
 }
 #endif
 
-bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
+bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
 {
   switch (elem.elem_type) {
     case ENUM:
@@ -356,7 +356,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<StructElem*>::const_iterator i = elem.elems.begin();
+      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
         if (((*i)->elem_type == ENUM)) {
@@ -374,7 +374,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
       os << "  out << YAML::BeginMap;" << endl;
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const StructElem& e = **i;
+        const TypeDefinition& e = **i;
         os << "  out << YAML::Key << \"" << e.name << "\";" << endl;
         os << "  out << YAML::Value << obj." << e.name << ";" << endl;
       }
