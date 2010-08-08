@@ -53,19 +53,19 @@ RslType RWGen::make_scalar_type(const YAML::Node &doc, string name)
   bool ok = true;
   if (type == "string") {
     elem.type = "std::string";
-    elem.elem_type = SCALAR;
+    elem.elem_type = BUILTIN;
   } else if (type == "uint64") {
     elem.type = "unsigned long long";
-    elem.elem_type = SCALAR;
+    elem.elem_type = BUILTIN;
   } else if (type == "int64") {
     elem.type = "long long";
-    elem.elem_type = SCALAR;
+    elem.elem_type = BUILTIN;
   } else if (type == "int") {
     elem.type = "int";
-    elem.elem_type = SCALAR;
+    elem.elem_type = BUILTIN;
   } else if (type == "uint") {
     elem.type = "unsigned int";
-    elem.elem_type = SCALAR;
+    elem.elem_type = BUILTIN;
   } else if (type == "enum") {
     elem.enum_def.name = to_lower_copy(elem.name);
     elem.enum_def.name[0] = toupper(elem.enum_def.name[0]);
@@ -140,12 +140,12 @@ bool RWGen::emit_header(const StructElem &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != SCALAR) {
+       if (elem.vector_type->elem_type != BUILTIN) {
          emit_header(*elem.vector_type, os);
        }
       break;
 
-    case SCALAR:
+    case BUILTIN:
       break;
 
     case STRUCT:
@@ -157,7 +157,7 @@ bool RWGen::emit_header(const StructElem &elem, ostream& os)
         } else if ((*i)->elem_type == STRUCT) {
           emit_header(**i, os);
         } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != SCALAR) {
+          if ((*i)->vector_type->elem_type != BUILTIN) {
             emit_header(*((*i)->vector_type), os);
           }
         }
@@ -212,12 +212,12 @@ bool RWGen::emit_reader(const StructElem &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != SCALAR) {
+       if (elem.vector_type->elem_type != BUILTIN) {
          emit_reader(*elem.vector_type, os);
        }
       break;
 
-    case SCALAR:
+    case BUILTIN:
       os << "void operator >>(const YAML::Node& node, " << elem.type << " &obj) {" << endl;
       os << "  node[\"" << elem.name << "\"] >> obj." << elem.name << ";" << endl;
       os << "}" << endl;
@@ -232,7 +232,7 @@ bool RWGen::emit_reader(const StructElem &elem, ostream& os)
         } else if ((*i)->elem_type == STRUCT) {
           emit_reader(**i, os);
         } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != SCALAR) {
+          if ((*i)->vector_type->elem_type != BUILTIN) {
             emit_reader(*((*i)->vector_type), os);
           }
         }
@@ -300,12 +300,12 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != SCALAR) {
+       if (elem.vector_type->elem_type != BUILTIN) {
          emit_dumper(*elem.vector_type, os);
        }
       break;
 
-    case SCALAR:
+    case BUILTIN:
       break;
 
     case STRUCT:
@@ -317,7 +317,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
         } else if ((*i)->elem_type == STRUCT) {
           emit_dumper(**i, os);
         } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != SCALAR) {
+          if ((*i)->vector_type->elem_type != BUILTIN) {
             emit_dumper(*((*i)->vector_type), os);
           }
         }
@@ -347,12 +347,12 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != SCALAR) {
+       if (elem.vector_type->elem_type != BUILTIN) {
          emit_dumper(*elem.vector_type, os);
        }
       break;
 
-    case SCALAR:
+    case BUILTIN:
       break;
 
     case STRUCT:
@@ -364,7 +364,7 @@ bool RWGen::emit_dumper(const StructElem &elem, ostream& os)
         } else if ((*i)->elem_type == STRUCT) {
           emit_dumper(**i, os);
         } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != SCALAR) {
+          if ((*i)->vector_type->elem_type != BUILTIN) {
             emit_dumper(*((*i)->vector_type), os);
           }
         }

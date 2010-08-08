@@ -9,7 +9,7 @@
 
 namespace YAVL
 {
-  enum ElemType { SCALAR, VECTOR, STRUCT, ENUM };
+  enum ElemType { BUILTIN, VECTOR, STRUCT, ENUM };
 
   std::string to_lower_copy(std::string s);
 
