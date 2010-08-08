@@ -21,7 +21,7 @@ int main(int argc, char **argv)
   }
 
   string topname(argv[2]);
-  YAVL::RWGen yatc(gr, topname);
+  YAVL::DataBinderGen yatc(gr, topname);
 
   ofstream hf;
   hf.open((topname + ".h").c_str());

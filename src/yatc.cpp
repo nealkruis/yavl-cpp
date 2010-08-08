@@ -16,11 +16,10 @@ string YAVL::to_lower_copy(string s)
   return rsl;
 }
 
-RslType RWGen::make_map_type(const YAML::Node &mapNode, string name)
+DataNodeDefinition DataBinderGen::make_map_type(const YAML::Node &mapNode, string name)
 {
-  bool ok = true;
-  TypeDefinition rsl;
-  rsl.elem_type = STRUCT;
+  DataNodeDefinition rsl;
+  rsl.kind_of_node = STRUCT;
   rsl.type = to_lower_copy(name);
   rsl.type[0] = toupper(rsl.type[0]);
   rsl.name = name;
@@ -28,15 +27,14 @@ RslType RWGen::make_map_type(const YAML::Node &mapNode, string name)
   for (YAML::Iterator i = mapNode.begin(); i != mapNode.end(); ++i) {
     string key = i.first();
     const YAML::Node &valueNode = i.second();
-    RslType subrsl = make_types(valueNode, key);
-    TypeDefinition *e = new TypeDefinition(subrsl.first);
+    DataNodeDefinition subrsl = make_types(valueNode, key);
+    DataNodeDefinition *e = new DataNodeDefinition(subrsl);
     rsl.elems.push_back(e);
-    ok = subrsl.second && ok;
   }
-  return make_pair(rsl, ok);
+  return rsl;
 }
 
-RslType RWGen::make_scalar_type(const YAML::Node &doc, string name)
+DataNodeDefinition DataBinderGen::make_scalar_type(const YAML::Node &doc, string name)
 {
   assert( doc.GetType() == YAML::CT_SEQUENCE );
 
@@ -46,67 +44,67 @@ RslType RWGen::make_scalar_type(const YAML::Node &doc, string name)
   string type = typespec_map.begin().first();
   const YAML::Node& type_specifics = typespec_map.begin().second();
 
-  TypeDefinition elem;
+  DataNodeDefinition elem;
 
   elem.name = name;
 
   bool ok = true;
   if (type == "string") {
     elem.type = "std::string";
-    elem.elem_type = BUILTIN;
+    elem.kind_of_node = BUILTIN;
   } else if (type == "uint64") {
     elem.type = "unsigned long long";
-    elem.elem_type = BUILTIN;
+    elem.kind_of_node = BUILTIN;
   } else if (type == "int64") {
     elem.type = "long long";
-    elem.elem_type = BUILTIN;
+    elem.kind_of_node = BUILTIN;
   } else if (type == "int") {
     elem.type = "int";
-    elem.elem_type = BUILTIN;
+    elem.kind_of_node = BUILTIN;
   } else if (type == "uint") {
     elem.type = "unsigned int";
-    elem.elem_type = BUILTIN;
+    elem.kind_of_node = BUILTIN;
   } else if (type == "enum") {
     elem.enum_def.name = to_lower_copy(elem.name);
     elem.enum_def.name[0] = toupper(elem.enum_def.name[0]);
     for (YAML::Iterator i = type_specifics.begin(); i != type_specifics.end(); ++i) {
       elem.enum_def.enum_values.push_back(*i);
     }
-    elem.elem_type = ENUM;
+    elem.kind_of_node = ENUM;
     elem.type = elem.enum_def.name;
   } else {
     ok = false;
   }
-  return make_pair(elem, ok);
+  return elem;
 }
 
-RslType RWGen::make_list_type(const YAML::Node &doc, string name)
+DataNodeDefinition DataBinderGen::make_list_type(const YAML::Node &doc, string name)
 {
-  TypeDefinition elem;
+  DataNodeDefinition elem;
   elem.name = name;
-  elem.elem_type = VECTOR;
+  elem.kind_of_node = VECTOR;
   
   //assert(num_keys(doc) == 1);
 
-  string vec_elem_type = to_lower_copy(name);
-  vec_elem_type[0] = toupper(vec_elem_type[0]);
-  if (*(vec_elem_type.end()-1) == 's') {
-     vec_elem_type.erase(vec_elem_type.end()-1);
+  string vec_kind_of_node = to_lower_copy(name);
+  vec_kind_of_node[0] = toupper(vec_kind_of_node[0]);
+  if (*(vec_kind_of_node.end()-1) == 's') {
+     vec_kind_of_node.erase(vec_kind_of_node.end()-1);
   }
-  RslType subrsl = make_types(doc, vec_elem_type);
-  TypeDefinition *e = new TypeDefinition(subrsl.first);
-  elem.vector_type = e;
+  DataNodeDefinition subrsl = make_types(doc, vec_kind_of_node);
+  DataNodeDefinition *e = new DataNodeDefinition(subrsl);
+  elem.listelem_def = e;
 
-  elem.type = string("std::vector<") + elem.vector_type->type + string(" >");
+  elem.type = string("std::vector<") + elem.listelem_def->type + string(" >");
 
-  return make_pair(elem, true);
+  return elem;
 }
 
-RslType RWGen::make_types(const YAML::Node& doc, string name)
+DataNodeDefinition DataBinderGen::make_types(const YAML::Node& doc, string name)
 {
   const YAML::Node *mapNode = 0;
   const YAML::Node *listNode = 0;
-  RslType rsl;
+  DataNodeDefinition rsl;
   if ((mapNode = doc.FindValue("map"))) {
     rsl = make_map_type(*mapNode, name);
   } else if ((listNode = doc.FindValue("list"))) {
@@ -117,7 +115,7 @@ RslType RWGen::make_types(const YAML::Node& doc, string name)
   return rsl;
 }
 
-void RWGen::emit_enum_def(const TypeDefinition &elem, ostream& os)
+void DataBinderGen::emit_enum_def(const DataNodeDefinition &elem, ostream& os)
 {
   os << "enum " << elem.enum_def.name << " { ";
   vector<string>::const_iterator i = elem.enum_def.enum_values.begin();
@@ -132,16 +130,16 @@ void RWGen::emit_enum_def(const TypeDefinition &elem, ostream& os)
   write_put_operator_prolog(os, elem.type, true /* prototype */);
 }
 
-bool RWGen::emit_header(const TypeDefinition &elem, ostream& os)
+bool DataBinderGen::emit_header(const DataNodeDefinition &elem, ostream& os)
 {
-  switch (elem.elem_type) {
+  switch (elem.kind_of_node) {
     case ENUM:
       emit_enum_def(elem, os);
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != BUILTIN) {
-         emit_header(*elem.vector_type, os);
+       if (elem.listelem_def->kind_of_node != BUILTIN) {
+         emit_header(*elem.listelem_def, os);
        }
       break;
 
@@ -149,16 +147,16 @@ bool RWGen::emit_header(const TypeDefinition &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
+      vector<DataNodeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
-        if (((*i)->elem_type == ENUM)) {
+        if (((*i)->kind_of_node == ENUM)) {
           emit_enum_def(**i, os);
-        } else if ((*i)->elem_type == STRUCT) {
+        } else if ((*i)->kind_of_node == STRUCT) {
           emit_header(**i, os);
-        } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != BUILTIN) {
-            emit_header(*((*i)->vector_type), os);
+        } else if ((*i)->kind_of_node == VECTOR) {
+          if ((*i)->listelem_def->kind_of_node != BUILTIN) {
+            emit_header(*((*i)->listelem_def), os);
           }
         }
       }
@@ -166,7 +164,7 @@ bool RWGen::emit_header(const TypeDefinition &elem, ostream& os)
       os << "struct " << elem.type << " {" << endl;
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const TypeDefinition& e = **i;
+        const DataNodeDefinition& e = **i;
         os << "  " << e.type << " " << e.name << ";" << endl;
       }
       os << "};" << endl;
@@ -177,20 +175,16 @@ bool RWGen::emit_header(const TypeDefinition &elem, ostream& os)
   return true;
 }
 
-bool RWGen::emit_header(ostream& os)
+bool DataBinderGen::emit_header(ostream& os)
 {
-  if (!types.second) {
-    return false;
-  }
   os << "#include <vector>" << endl;
   os << "#include <string>" << endl;
   os << "#include \"yaml.h\"" << endl;
-  os << "#include \"" << dumper_header << "\"" << endl;
-  emit_header(types.first, os);
+  emit_header(root_data_defn, os);
   return true;
 }
 
-void RWGen::emit_enum_reader(const TypeDefinition &elem, ostream& os)
+void DataBinderGen::emit_enum_reader(const DataNodeDefinition &elem, ostream& os)
 {
   os << "void operator >>(const YAML::Node& node, " << elem.type << " &obj) {" << endl;
   os << "  string tmp; node >> tmp;" << endl;
@@ -201,9 +195,9 @@ void RWGen::emit_enum_reader(const TypeDefinition &elem, ostream& os)
   os << "}" << endl;
 }
 
-bool RWGen::emit_reader(const TypeDefinition &elem, ostream& os)
+bool DataBinderGen::emit_reader(const DataNodeDefinition &elem, ostream& os)
 {
-  switch (elem.elem_type) {
+  switch (elem.kind_of_node) {
     case ENUM:
       emit_enum_reader(elem, os);
       os << "void operator >>(const YAML::Node& node, " << elem.type << " &obj) {" << endl;
@@ -212,8 +206,8 @@ bool RWGen::emit_reader(const TypeDefinition &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != BUILTIN) {
-         emit_reader(*elem.vector_type, os);
+       if (elem.listelem_def->kind_of_node != BUILTIN) {
+         emit_reader(*elem.listelem_def, os);
        }
       break;
 
@@ -224,16 +218,16 @@ bool RWGen::emit_reader(const TypeDefinition &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
+      vector<DataNodeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
-        if (((*i)->elem_type == ENUM)) {
+        if (((*i)->kind_of_node == ENUM)) {
           emit_enum_reader(**i, os);
-        } else if ((*i)->elem_type == STRUCT) {
+        } else if ((*i)->kind_of_node == STRUCT) {
           emit_reader(**i, os);
-        } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != BUILTIN) {
-            emit_reader(*((*i)->vector_type), os);
+        } else if ((*i)->kind_of_node == VECTOR) {
+          if ((*i)->listelem_def->kind_of_node != BUILTIN) {
+            emit_reader(*((*i)->listelem_def), os);
           }
         }
       }
@@ -241,7 +235,7 @@ bool RWGen::emit_reader(const TypeDefinition &elem, ostream& os)
       os << "void operator >>(const YAML::Node& node, " << elem.type << " &obj) {" << endl;
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const TypeDefinition& e = **i;
+        const DataNodeDefinition& e = **i;
         os << "  node[\"" << e.name << "\"] >> obj." << e.name << ";" << endl;
       }
       os << "}" << endl;
@@ -250,18 +244,15 @@ bool RWGen::emit_reader(const TypeDefinition &elem, ostream& os)
   return true;
 }
 
-bool RWGen::emit_reader(ostream& os)
+bool DataBinderGen::emit_reader(ostream& os)
 {
-  if (!types.second) {
-    return false;
-  }
   os << "#include \"" << to_lower_copy(topname) << ".h\"" << endl;
   os << "using namespace std;" << endl;
-  emit_reader(types.first, os);
+  emit_reader(root_data_defn, os);
   return true;
 }
 
-void RWGen::emit_enum_dumper(const TypeDefinition &elem, ostream& os)
+void DataBinderGen::emit_enum_dumper(const DataNodeDefinition &elem, ostream& os)
 {
   write_put_operator_prolog(os, elem.type);
   vector<string>::const_iterator i = elem.enum_def.enum_values.begin();
@@ -271,7 +262,7 @@ void RWGen::emit_enum_dumper(const TypeDefinition &elem, ostream& os)
   write_put_operator_epilog(os);
 }
 
-bool RWGen::write_put_operator_prolog(ostream& os, string type, bool prototype)
+bool DataBinderGen::write_put_operator_prolog(ostream& os, string type, bool prototype)
 {
   os << "YAML::Emitter& operator <<(YAML::Emitter& out, const " << type << " &obj)";
   if (!prototype) {
@@ -282,16 +273,16 @@ bool RWGen::write_put_operator_prolog(ostream& os, string type, bool prototype)
   os << endl;
 }
 
-bool RWGen::write_put_operator_epilog(ostream& os)
+bool DataBinderGen::write_put_operator_epilog(ostream& os)
 {
   os << "  return out;" << endl;
   os << "}" << endl;
 }
 
 #if 0
-bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
+bool DataBinderGen::emit_dumper(const DataNodeDefinition &elem, ostream& os)
 {
-  switch (elem.elem_type) {
+  switch (elem.kind_of_node) {
     case ENUM:
       emit_enum_dumper(elem, os);
       write_put_operator_prolog(os, elem.type);
@@ -300,8 +291,8 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != BUILTIN) {
-         emit_dumper(*elem.vector_type, os);
+       if (elem.listelem_def->kind_of_node != BUILTIN) {
+         emit_dumper(*elem.listelem_def, os);
        }
       break;
 
@@ -309,16 +300,16 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
+      vector<DataNodeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
-        if (((*i)->elem_type == ENUM)) {
+        if (((*i)->kind_of_node == ENUM)) {
           emit_enum_dumper(**i, os);
-        } else if ((*i)->elem_type == STRUCT) {
+        } else if ((*i)->kind_of_node == STRUCT) {
           emit_dumper(**i, os);
-        } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != BUILTIN) {
-            emit_dumper(*((*i)->vector_type), os);
+        } else if ((*i)->kind_of_node == VECTOR) {
+          if ((*i)->listelem_def->kind_of_node != BUILTIN) {
+            emit_dumper(*((*i)->listelem_def), os);
           }
         }
       }
@@ -326,7 +317,7 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
       write_put_operator_prolog(os, elem.type);
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const TypeDefinition& e = **i;
+        const DataNodeDefinition& e = **i;
         os << "  os << \"" << e.name << ": \" << obj." << e.name << " << endl;" << endl;
       }
       write_put_operator_epilog(os);
@@ -336,9 +327,9 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
 }
 #endif
 
-bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
+bool DataBinderGen::emit_dumper(const DataNodeDefinition &elem, ostream& os)
 {
-  switch (elem.elem_type) {
+  switch (elem.kind_of_node) {
     case ENUM:
       emit_enum_dumper(elem, os);
       write_put_operator_prolog(os, elem.type);
@@ -347,8 +338,8 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
       break;
 
     case VECTOR:
-       if (elem.vector_type->elem_type != BUILTIN) {
-         emit_dumper(*elem.vector_type, os);
+       if (elem.listelem_def->kind_of_node != BUILTIN) {
+         emit_dumper(*elem.listelem_def, os);
        }
       break;
 
@@ -356,16 +347,16 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
       break;
 
     case STRUCT:
-      vector<TypeDefinition*>::const_iterator i = elem.elems.begin();
+      vector<DataNodeDefinition*>::const_iterator i = elem.elems.begin();
       // pass one: emit what I depend on
       for (; i != elem.elems.end(); ++i) {
-        if (((*i)->elem_type == ENUM)) {
+        if (((*i)->kind_of_node == ENUM)) {
           emit_enum_dumper(**i, os);
-        } else if ((*i)->elem_type == STRUCT) {
+        } else if ((*i)->kind_of_node == STRUCT) {
           emit_dumper(**i, os);
-        } else if ((*i)->elem_type == VECTOR) {
-          if ((*i)->vector_type->elem_type != BUILTIN) {
-            emit_dumper(*((*i)->vector_type), os);
+        } else if ((*i)->kind_of_node == VECTOR) {
+          if ((*i)->listelem_def->kind_of_node != BUILTIN) {
+            emit_dumper(*((*i)->listelem_def), os);
           }
         }
       }
@@ -374,7 +365,7 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
       os << "  out << YAML::BeginMap;" << endl;
       i = elem.elems.begin();
       for (; i != elem.elems.end(); ++i) {
-        const TypeDefinition& e = **i;
+        const DataNodeDefinition& e = **i;
         os << "  out << YAML::Key << \"" << e.name << "\";" << endl;
         os << "  out << YAML::Value << obj." << e.name << ";" << endl;
       }
@@ -384,12 +375,10 @@ bool RWGen::emit_dumper(const TypeDefinition &elem, ostream& os)
   }
   return true;
 }
-bool RWGen::emit_dumper(ostream& os)
+
+bool DataBinderGen::emit_dumper(ostream& os)
 {
-  if (!types.second) {
-    return false;
-  }
-  emit_dumper(types.first, os);
+  emit_dumper(root_data_defn, os);
   return true;
 }
 
