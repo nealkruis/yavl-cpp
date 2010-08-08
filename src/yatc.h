@@ -18,16 +18,16 @@ namespace YAVL
     std::vector<std::string> enum_values;
   };
 
-  struct StructElem {
+  struct TypeDefinition {
     ElemType elem_type;
     std::string name;
     std::string type;
     EnumDef enum_def;
-    StructElem* vector_type;  // type of list elements. ignored for others.
-    std::vector<StructElem*> elems; // types of members. ignored except in struct.
+    TypeDefinition* vector_type;  // type of list elements. ignored for others.
+    std::vector<TypeDefinition*> elems; // types of members. ignored except in struct.
   };
 
-  typedef std::pair<StructElem, bool> RslType;
+  typedef std::pair<TypeDefinition, bool> RslType;
 
   class RWGen {
   protected:
@@ -41,13 +41,13 @@ namespace YAVL
     RslType make_map_type(const YAML::Node &mapNode, std::string name);
     RslType make_scalar_type(const YAML::Node &gr, std::string name);
 
-    void emit_enum_def(const StructElem &elem, std::ostream& os);
-    bool emit_header(const StructElem &elem, std::ostream& os);
-    void emit_enum_reader(const StructElem &elem, std::ostream& os);
-    bool emit_reader(const StructElem &elem, std::ostream& os);
+    void emit_enum_def(const TypeDefinition &elem, std::ostream& os);
+    bool emit_header(const TypeDefinition &elem, std::ostream& os);
+    void emit_enum_reader(const TypeDefinition &elem, std::ostream& os);
+    bool emit_reader(const TypeDefinition &elem, std::ostream& os);
 
-    virtual void emit_enum_dumper(const StructElem &elem, std::ostream& os);
-    virtual bool emit_dumper(const StructElem &elem, std::ostream& os);
+    virtual void emit_enum_dumper(const TypeDefinition &elem, std::ostream& os);
+    virtual bool emit_dumper(const TypeDefinition &elem, std::ostream& os);
 
     bool write_put_operator_epilog(std::ostream& os);
     bool write_put_operator_prolog(std::ostream& os,
@@ -71,8 +71,8 @@ namespace YAVL
       };
       
     virtual bool emit_dumper(std::ostream& os);
-    virtual void emit_enum_dumper(const StructElem &elem, std::ostream& os);
-    virtual bool emit_dumper(const StructElem &elem, std::ostream& os);
+    virtual void emit_enum_dumper(const TypeDefinition &elem, std::ostream& os);
+    virtual bool emit_dumper(const TypeDefinition &elem, std::ostream& os);
   };
 #endif
 }
