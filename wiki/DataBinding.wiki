@@ -44,6 +44,9 @@ For a YAML enum, a C++ enum is generated.
 
 ==Generated Structs==
 
+These are the structs generated for the tree specification
+above:
+
 {{{
 struct A {
   std::string a1;
@@ -77,13 +80,12 @@ YAML-CPP works by overloading the '<<' and '>>' operators.
 So this tool basically generates code for these two
 operators for each generated struct.
 
-==Dependencies==
-
 ==Usage==
 
 First you need to make the program that generates the code.
 After that, you run the code generator on the tree spec.
-And you include the *generated* code in your own program.
+And you compile in the *generated* code along with the
+rest of your program (see  the steps below).
 
 ==Compiling Code Generator==
 
