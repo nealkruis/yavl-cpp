@@ -1,0 +1,150 @@
+# Data Binding for YAML and C++ #
+
+NEW! YAVL-CPP now supports data binding!
+
+This means we can now generate C++ code to read a YAML file into
+in-memory data structures, and to serialize the in-memory
+data structures into a YAML file on disk.
+
+The specification of the YAML structure that is to read
+to memory is in the same format as for the validator.
+
+Note: the generated code uses the excellent YAML-CPP to
+read and write YAML.
+
+## Example Tree Specification ##
+
+```
+map:
+  header:
+    map:
+      name: [string: ]
+      version: [string: ]
+      size: [enum: [big, small]]
+      pieces:
+        map:
+          a:
+            list:
+              map:
+                a1:  [string: ]
+                a2:  [string: ]
+          b:
+            list: [int: ]
+```
+
+## Mapping from YAML to C++ ##
+
+A C++ struct is created to read in the contents of YAML map.
+
+A YAML list is read into C++ STL vector.
+
+A YAML string is mapped to a C++ string.
+
+For a YAML enum, a C++ enum is generated.
+
+## Generated Structs ##
+
+These are the structs generated for the tree specification
+above:
+
+```
+struct A {
+  std::string a1;
+  std::string a2;
+};
+
+struct Pieces {
+  std::vector<A > a;
+  std::vector<int > b;
+};
+
+enum Size { big, small };
+
+struct Header {
+  std::string name;
+  Pieces pieces;
+  Size size;
+  std::string version;
+};
+
+struct Top {
+  Header header;
+};
+```
+
+## Outline of Generated Code to Read and Write YAML ##
+
+The generated code is a client of the YAML-CPP library.
+YAML-CPP works by overloading the '<<' and '>>' operators.
+
+So this tool basically generates code for these two
+operators for each generated struct.
+
+## Usage ##
+
+First you need to make the program that generates the code.
+After that, you run the code generator on the tree spec.
+And you compile in the **generated** code along with the
+rest of your program (see  the steps below).
+
+## Compiling Code Generator ##
+
+The code generator program is called 'tc' and its source
+code is in example-code/tc.cpp. Here is how to compile it:
+YAML\_CPP\_DIR is where you untarred the yaml-cpp source
+and YAVL\_CPP\_DIR is where you untarred the yavl-cpp source.
+
+```
+g++ -I$YAML_CPP_DIR/include -I$YAVL_CPP_DIR/src \
+  $YAML_CPP_DIR/src/*.cpp \
+  $YAVL_CPP_DIR/src/yatc.cpp \
+  $YAVL_CPP_DIR/example-code/tc.cpp -o tc
+```
+
+## Running Code Generator ##
+
+Run it on the example tree specification example-specs/gr4.yaml
+like this:
+
+```
+tc $YAVL_CPP_DIR/example-specs/gr4.yaml top
+```
+
+The second command line parameter specifies the name of the
+top-level struct (with first letter capitalized). It will contain a single data member
+which will recursively contain the structs for the rest of
+the YAML file.
+
+The header file containing struct definitions and function
+prototypes is emitted to 'top.h' and the read/write code
+is emitted to 'top.cpp'.
+
+## Using the Generated Code ##
+
+The example program example-code/yatc-client.cpp shows how to
+use the generated code. You don't have to do much different
+from what the YAML-CPP documentation says. The program
+should be fairly self-explanatory.
+
+The example program expects to find the header in 'top.h'
+and to be given a YAML filename on the command line. It reads
+the YAML file into C structs, using the generated code.
+
+After reading, it dumps the in-memory structs out to standard
+out in YAML format, also using the generated code.
+
+Here is how to compile it:
+
+```
+g++ -g -I. -I$YAML_CPP_DIR/include -I$YAVL_CPP_DIR/src \
+  $YAML_CPP_DIR/*.o $YAVL_CPP_DIR/example-code/yatc-client.cpp \
+  top.cpp
+```
+
+And here is how to run it:
+
+```
+a.out $YAVL_CPP_DIR/example-specs/y0.gr4.yaml
+```
+
+eof
